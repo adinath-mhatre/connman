@@ -252,6 +252,8 @@ static gboolean dhcp_retry_cb(gpointer user_data)
 static void no_lease_cb(GDHCPClient *dhcp_client, gpointer user_data)
 {
 	struct connman_dhcp *dhcp = user_data;
+	struct connman_service *service;
+	bool disable_ipv4ll_fallback;
 	int err;
 
 	DBG("No lease available ipv4ll %d client %p", dhcp->ipv4ll_running,
@@ -264,6 +266,12 @@ static void no_lease_cb(GDHCPClient *dhcp_client, gpointer user_data)
 						dhcp_retry_cb,
 						dhcp);
 	if (dhcp->ipv4ll_running)
+		return;
+
+	service = connman_service_lookup_from_network(dhcp->network);
+	disable_ipv4ll_fallback = __connman_service_is_ipv4ll_fallback(service);
+
+	if (disable_ipv4ll_fallback)
 		return;
 
 	err = ipv4ll_start_client(dhcp);

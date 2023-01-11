@@ -223,6 +223,12 @@ If this option is not set, it tries to write into
 @runstatedir@/connman/resolv.conf and fallbacks to @sysconfdir@/resolv.conf if
 it fails (@runstatedir@/connman does not exist or is not writeable).
 If you do not want to update resolv.conf, you can set /dev/null.
+.TP
+.BI DisableFallbackIPv4ll =true\ \fR|\fB\ false
+Disable IPv4 link local address.
+If this setting is true, IPv4 link local address will be disabled
+and no auto-IP will get assigned.
+Default value is false.
 .SH "EXAMPLE"
 The following example configuration disables hostname updates and enables
 ethernet tethering.

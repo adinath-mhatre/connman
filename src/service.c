@@ -110,6 +110,7 @@ struct connman_service {
 	char *domainname;
 	char **timeservers;
 	char **timeservers_config;
+	bool disable_fallback_ipv4ll;
 	/* 802.1x settings from the config files */
 	char *eap;
 	char *identity;
@@ -472,6 +473,7 @@ static int service_load(struct connman_service *service)
 	gchar *str;
 	bool autoconnect;
 	unsigned int ssid_len;
+	bool val;
 	int err = 0;
 
 	DBG("service %p", service);
@@ -649,6 +651,14 @@ static int service_load(struct connman_service *service)
 	service->hidden_service = g_key_file_get_boolean(keyfile,
 					service->identifier, "Hidden", NULL);
 
+	val = g_key_file_get_boolean(keyfile,
+			service->identifier, "Disable.Fallback.IPv4ll", &error);
+
+	if (!error)
+		service->disable_fallback_ipv4ll = val;
+
+	g_clear_error(&error);
+
 done:
 	g_key_file_free(keyfile);
 
@@ -825,6 +835,9 @@ static int service_save(struct connman_service *service)
 	if (service->config_entry && strlen(service->config_entry) > 0)
 		g_key_file_set_string(keyfile, service->identifier,
 				"Config.ident", service->config_entry);
+
+	g_key_file_set_boolean(keyfile, service->identifier,
+		"Disable.Fallback.IPv4ll", service->disable_fallback_ipv4ll);
 
 done:
 	__connman_storage_save_service(keyfile, service->identifier);
@@ -2306,6 +2319,19 @@ static void link_changed(struct connman_service *service)
 						append_ethernet, service);
 }
 
+static void ipv4ll_fallback_flag_changed(struct connman_service *service)
+{
+	dbus_bool_t val = service->disable_fallback_ipv4ll;
+
+	if (!allow_property_changed(service))
+		return;
+
+	connman_dbus_property_changed_basic(service->path,
+			CONNMAN_SERVICE_INTERFACE,
+			"Disable.Fallback.IPv4ll",
+			DBUS_TYPE_BOOLEAN, &val);
+}
+
 static void stats_append_counters(DBusMessageIter *dict,
 			struct connman_stats_data *stats,
 			struct connman_stats_data *counters,
@@ -2670,6 +2696,10 @@ static void append_properties(DBusMessageIter *dict, dbus_bool_t limited,
 
 	connman_dbus_dict_append_dict(dict, "Provider",
 						append_provider, service);
+
+	val = service->disable_fallback_ipv4ll;
+	connman_dbus_dict_append_basic(dict, "Disable.Fallback.IPv4ll",
+				DBUS_TYPE_BOOLEAN, &val);
 
 	if (service->network)
 		connman_network_append_acddbus(dict, service->network);
@@ -3929,6 +3959,21 @@ static DBusMessage *set_property(DBusConnection *conn,
 				__connman_network_enable_ipconfig(service->network,
 								service->ipconfig_ipv6);
 		}
+
+		service_save(service);
+	} else if (g_str_equal(name, "Disable.Fallback.IPv4ll")) {
+		dbus_bool_t val;
+
+		if (service->immutable)
+			return __connman_error_not_supported(msg);
+
+		if (type != DBUS_TYPE_BOOLEAN)
+			return __connman_error_invalid_arguments(msg);
+
+		dbus_message_iter_get_basic(&value, &val);
+		service->disable_fallback_ipv4ll = val;
+
+		ipv4ll_fallback_flag_changed(service);
 
 		service_save(service);
 	} else
@@ -5552,6 +5597,14 @@ __connman_service_get_ipconfig(struct connman_service *service, int family)
 	else
 		return NULL;
 
+}
+
+bool __connman_service_is_ipv4ll_fallback(struct connman_service *service)
+{
+	if (!service)
+		return false;
+
+	return service->disable_fallback_ipv4ll;
 }
 
 bool __connman_service_is_connected_state(struct connman_service *service,
@@ -7552,6 +7605,8 @@ struct connman_service * __connman_service_create_from_network(struct connman_ne
 		service->ipconfig_ipv6 = create_ip6config(service, index);
 	else
 		__connman_ipconfig_set_index(service->ipconfig_ipv6, index);
+
+	service->disable_fallback_ipv4ll = connman_setting_get_bool("DisableFallbackIPv4ll");
 
 	service_register(service);
 	service_schedule_added(service);

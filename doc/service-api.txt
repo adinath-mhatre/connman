@@ -552,3 +552,8 @@ Properties	string State [readonly]
 				If a previous conflict could be resolved by probing another
 				IPv4 address (which is not an IPv4LL) then this boolean is set
 				to true.
+
+		bool Disable.Fallback.IPv4ll [readwrite]
+
+			If set to true, IPv4 link local address will be disabled
+			and no auto-IP will get assigned.

@@ -112,6 +112,7 @@ static struct {
 	char *localtime;
 	bool regdom_follows_timezone;
 	char *resolv_conf;
+	bool disable_ipv4ll_fallback;
 } connman_settings  = {
 	.bg_scan = true,
 	.pref_timeservers = NULL,
@@ -141,6 +142,7 @@ static struct {
 	.use_gateways_as_timeservers = false,
 	.localtime = NULL,
 	.resolv_conf = NULL,
+	.disable_ipv4ll_fallback = false,
 };
 
 #define CONF_BG_SCAN                    "BackgroundScanning"
@@ -172,6 +174,7 @@ static struct {
 #define CONF_LOCALTIME                  "Localtime"
 #define CONF_REGDOM_FOLLOWS_TIMEZONE    "RegdomFollowsTimezone"
 #define CONF_RESOLV_CONF                "ResolvConf"
+#define CONF_DISABLE_FALLBACK_IPV4LL    "DisableFallbackIPv4ll"
 
 static const char *supported_options[] = {
 	CONF_BG_SCAN,
@@ -203,6 +206,7 @@ static const char *supported_options[] = {
 	CONF_LOCALTIME,
 	CONF_REGDOM_FOLLOWS_TIMEZONE,
 	CONF_RESOLV_CONF,
+	CONF_DISABLE_FALLBACK_IPV4LL,
 	NULL
 };
 
@@ -607,6 +611,13 @@ static void parse_config(GKeyFile *config)
 		g_free(string);
 
 	g_clear_error(&error);
+
+	boolean = __connman_config_get_bool(config, "General",
+				CONF_DISABLE_FALLBACK_IPV4LL, &error);
+	if (!error)
+		connman_settings.disable_ipv4ll_fallback = boolean;
+
+	g_clear_error(&error);
 }
 
 static int config_init(const char *file)
@@ -844,6 +855,9 @@ bool connman_setting_get_bool(const char *key)
 
 	if (g_str_equal(key, CONF_RESOLV_CONF))
 		return connman_settings.resolv_conf;
+
+	if (g_str_equal(key, CONF_DISABLE_FALLBACK_IPV4LL))
+		return connman_settings.disable_ipv4ll_fallback;
 
 	return false;
 }

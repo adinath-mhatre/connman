@@ -838,6 +838,7 @@ void __connman_service_notify(struct connman_service *service,
 
 int __connman_service_counter_register(const char *counter);
 void __connman_service_counter_unregister(const char *counter);
+bool __connman_service_is_ipv4ll_fallback(struct connman_service *service);
 
 #include <connman/peer.h>
 
