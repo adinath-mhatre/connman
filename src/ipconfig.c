@@ -55,6 +55,7 @@ struct connman_ipconfig {
 	int ipv6_privacy_config;
 	char *last_dhcp_address;
 	char **last_dhcpv6_prefixes;
+	bool ipv4_fallback_ll;
 };
 
 struct connman_ipdevice {
@@ -449,6 +450,45 @@ bool __connman_ipconfig_ipv6_privacy_enabled(struct connman_ipconfig *ipconfig)
 		return false;
 
 	return ipconfig->ipv6_privacy_config == 0 ? FALSE : TRUE;
+}
+
+static const char *fallback_ipv4ll2string(bool fallback_ipv4ll)
+{
+	if (fallback_ipv4ll)
+		return "enable";
+	else
+		return "disable";
+}
+
+static bool string2fallback_ipv4ll(const char *fallback_ipv4ll)
+{
+	if (g_strcmp0(fallback_ipv4ll, "disable") == 0)
+		return false;
+	else
+		return true;
+}
+
+bool __connman_ipconfig_get_ipv4_fallback_ll(struct connman_ipconfig *ipconfig)
+{
+	if (!ipconfig)
+		return true;
+
+	return ipconfig->ipv4_fallback_ll;
+}
+
+int __connman_ipconfig_set_ipv4_fallback_ll(struct connman_ipconfig *ipconfig,
+						const char *value)
+{
+	bool fallback_ipv4ll;
+
+	if (!ipconfig)
+		return -EINVAL;
+
+	fallback_ipv4ll = string2fallback_ipv4ll(value);
+
+	ipconfig->ipv4_fallback_ll = fallback_ipv4ll;
+
+	return 0;
 }
 
 bool __connman_ipconfig_ipv6_is_enabled(struct connman_ipconfig *ipconfig)
@@ -1299,6 +1339,7 @@ struct connman_ipconfig *__connman_ipconfig_create(int index,
 	}
 
 	ipconfig->system = connman_ipaddress_alloc(AF_INET);
+	ipconfig->ipv4_fallback_ll = true;
 
 	ipconfig_set_p2p(index, ipconfig);
 
@@ -1899,7 +1940,7 @@ void __connman_ipconfig_append_ipv4(struct connman_ipconfig *ipconfig,
 							DBusMessageIter *iter)
 {
 	struct connman_ipaddress *append_addr = NULL;
-	const char *str;
+	const char *str, *fallback_ipv4ll;
 
 	if (ipconfig->type != CONNMAN_IPCONFIG_TYPE_IPV4)
 		return;
@@ -1921,8 +1962,15 @@ void __connman_ipconfig_append_ipv4(struct connman_ipconfig *ipconfig,
 
 	case CONNMAN_IPCONFIG_METHOD_AUTO:
 	case CONNMAN_IPCONFIG_METHOD_MANUAL:
+		append_addr = ipconfig->system;
+		break;
+
 	case CONNMAN_IPCONFIG_METHOD_DHCP:
 		append_addr = ipconfig->system;
+
+		fallback_ipv4ll = fallback_ipv4ll2string(ipconfig->ipv4_fallback_ll);
+		connman_dbus_dict_append_basic(iter, "FallbackIPv4LL",
+						DBUS_TYPE_STRING, &fallback_ipv4ll);
 		break;
 	}
 
@@ -2052,7 +2100,7 @@ void __connman_ipconfig_append_ipv6config(struct connman_ipconfig *ipconfig,
 void __connman_ipconfig_append_ipv4config(struct connman_ipconfig *ipconfig,
 							DBusMessageIter *iter)
 {
-	const char *str;
+	const char *str, *fallback_ipv4ll;
 
 	str = __connman_ipconfig_method2string(ipconfig->method);
 	if (!str)
@@ -2063,9 +2111,15 @@ void __connman_ipconfig_append_ipv4config(struct connman_ipconfig *ipconfig,
 	switch (ipconfig->method) {
 	case CONNMAN_IPCONFIG_METHOD_UNKNOWN:
 	case CONNMAN_IPCONFIG_METHOD_OFF:
-	case CONNMAN_IPCONFIG_METHOD_DHCP:
 	case CONNMAN_IPCONFIG_METHOD_AUTO:
 		return;
+
+	case CONNMAN_IPCONFIG_METHOD_DHCP:
+		fallback_ipv4ll = fallback_ipv4ll2string(ipconfig->ipv4_fallback_ll);
+		connman_dbus_dict_append_basic(iter, "FallbackIPv4LL",
+						DBUS_TYPE_STRING, &fallback_ipv4ll);
+		return;
+
 	case CONNMAN_IPCONFIG_METHOD_FIXED:
 	case CONNMAN_IPCONFIG_METHOD_MANUAL:
 		break;
@@ -2099,10 +2153,11 @@ int __connman_ipconfig_set_config(struct connman_ipconfig *ipconfig,
 {
 	enum connman_ipconfig_method method = CONNMAN_IPCONFIG_METHOD_UNKNOWN;
 	const char *address = NULL, *netmask = NULL, *gateway = NULL,
-		*privacy_string = NULL;
+		*privacy_string = NULL, *fallback_ipv4ll_string = NULL;
 	int prefix_length = 0, privacy = 0;
 	DBusMessageIter dict;
 	int type = -1;
+	dbus_bool_t fallback_ipv4ll = 1;
 
 	if (dbus_message_iter_get_arg_type(array) != DBUS_TYPE_ARRAY)
 		return -EINVAL;
@@ -2166,15 +2221,21 @@ int __connman_ipconfig_set_config(struct connman_ipconfig *ipconfig,
 
 			dbus_message_iter_get_basic(&value, &privacy_string);
 			privacy = string2privacy(privacy_string);
+		} else if (g_str_equal(key, "FallbackIPv4LL")) {
+			if (type != DBUS_TYPE_STRING)
+				return -EINVAL;
+
+			dbus_message_iter_get_basic(&value, &fallback_ipv4ll_string);
+			fallback_ipv4ll = string2fallback_ipv4ll(fallback_ipv4ll_string);
 		}
 
 		dbus_message_iter_next(&dict);
 	}
 
 	DBG("method %d address %s netmask %s gateway %s prefix_length %d "
-		"privacy %s",
+		"privacy %s fallback_ipv4ll %s",
 		method, address, netmask, gateway, prefix_length,
-		privacy_string);
+		privacy_string, fallback_ipv4ll_string);
 
 	switch (method) {
 	case CONNMAN_IPCONFIG_METHOD_UNKNOWN:
@@ -2237,6 +2298,7 @@ int __connman_ipconfig_set_config(struct connman_ipconfig *ipconfig,
 			return -EOPNOTSUPP;
 
 		ipconfig->method = method;
+		ipconfig->ipv4_fallback_ll = fallback_ipv4ll;
 		break;
 	}
 
@@ -2283,6 +2345,7 @@ void __connman_ipconfig_load(struct connman_ipconfig *ipconfig,
 	struct ipconfig_store is = { .file = keyfile,
 				     .group = identifier,
 				     .prefix = prefix };
+	bool skip_fallback_ipv4ll = false;
 
 	DBG("ipconfig %p identifier %s", ipconfig, identifier);
 
@@ -2364,6 +2427,13 @@ void __connman_ipconfig_load(struct connman_ipconfig *ipconfig,
 		 */
 		__connman_ipconfig_set_method(ipconfig,
 					CONNMAN_IPCONFIG_METHOD_DHCP);
+
+		/*
+		 * If IPv4 method is AUTO then we enable
+		 * IPv4LL fallback.
+		 */
+		ipconfig->ipv4_fallback_ll = true;
+		skip_fallback_ipv4ll = true;
 		/* fall through */
 
 	case CONNMAN_IPCONFIG_METHOD_DHCP:
@@ -2373,6 +2443,17 @@ void __connman_ipconfig_load(struct connman_ipconfig *ipconfig,
 			ipconfig->last_dhcp_address = str;
 		}
 
+		if (skip_fallback_ipv4ll)
+			break;
+
+		char *fallback_ipv4ll;
+
+		ipconfig->ipv4_fallback_ll = true;
+
+		fallback_ipv4ll = store_get_str(&is, "fallback_ipv4ll");
+		ipconfig->ipv4_fallback_ll = string2fallback_ipv4ll(fallback_ipv4ll);
+
+		g_free(fallback_ipv4ll);
 		break;
 	}
 }
@@ -2407,6 +2488,11 @@ void __connman_ipconfig_save(struct connman_ipconfig *ipconfig,
 		break;
 
 	case CONNMAN_IPCONFIG_METHOD_DHCP:
+		if (ipconfig->type == CONNMAN_IPCONFIG_TYPE_IPV4) {
+			store_set_str(&is, "fallback_ipv4ll",
+				fallback_ipv4ll2string(ipconfig->ipv4_fallback_ll));
+		}
+
 		store_set_str(&is, "DHCP.LastAddress",
 				ipconfig->last_dhcp_address);
 		/* fall through */

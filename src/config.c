@@ -67,6 +67,7 @@ struct connman_config_service {
 	char *ipv4_address;
 	char *ipv4_netmask;
 	char *ipv4_gateway;
+	char *ipv4_fallback_ll;
 	char *ipv6_address;
 	unsigned char ipv6_prefix_length;
 	char *ipv6_gateway;
@@ -117,6 +118,7 @@ static bool cleanup = false;
 #define SERVICE_KEY_MDNS               "mDNS"
 
 #define SERVICE_KEY_IPv4               "IPv4"
+#define SERVICE_KEY_IPv4_FALLBACK_LL   "IPv4.FallbackIPv4LL"
 #define SERVICE_KEY_IPv6               "IPv6"
 #define SERVICE_KEY_IPv6_PRIVACY       "IPv6.Privacy"
 #define SERVICE_KEY_MAC                "MAC"
@@ -153,6 +155,7 @@ static const char *service_possible_keys[] = {
 	SERVICE_KEY_SECURITY,
 	SERVICE_KEY_HIDDEN,
 	SERVICE_KEY_IPv4,
+	SERVICE_KEY_IPv4_FALLBACK_LL,
 	SERVICE_KEY_IPv6,
 	SERVICE_KEY_IPv6_PRIVACY,
 	SERVICE_KEY_MAC,
@@ -256,6 +259,7 @@ free_only:
 	g_free(config_service->ipv4_address);
 	g_free(config_service->ipv4_gateway);
 	g_free(config_service->ipv4_netmask);
+	g_free(config_service->ipv4_fallback_ll);
 	g_free(config_service->ipv6_address);
 	g_free(config_service->ipv6_gateway);
 	g_free(config_service->ipv6_privacy);
@@ -442,6 +446,14 @@ static bool load_service_generic(GKeyFile *keyfile,
 			service->ipv4_netmask = mask;
 
 		g_free(str);
+	}
+
+	str = __connman_config_get_string(keyfile, group, SERVICE_KEY_IPv4_FALLBACK_LL,
+									NULL);
+
+	if (str) {
+		g_free(service->ipv4_fallback_ll);
+		service->ipv4_fallback_ll = str;
 	}
 
 	str =  __connman_config_get_string(keyfile, group, SERVICE_KEY_IPv6, NULL);
@@ -1378,6 +1390,15 @@ static int try_provision_service(struct connman_config_service *config,
 								network);
 
 		connman_ipaddress_free(address);
+	}
+
+	if ((g_ascii_strcasecmp(config->ipv4_address, "dhcp") == 0) && config->ipv4_fallback_ll) {
+		struct connman_ipconfig *ipconfig;
+
+		ipconfig = __connman_service_get_ip4config(service);
+		if (ipconfig)
+			__connman_ipconfig_set_ipv4_fallback_ll(ipconfig,
+							config->ipv4_fallback_ll);
 	}
 
 	__connman_service_disconnect(service);

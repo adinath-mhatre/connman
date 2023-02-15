@@ -435,6 +435,8 @@ bool __connman_ipconfig_ipv6_is_enabled(struct connman_ipconfig *ipconfig);
 
 int __connman_ipconfig_set_rp_filter();
 void __connman_ipconfig_unset_rp_filter(int old_value);
+bool __connman_ipconfig_get_ipv4_fallback_ll(struct connman_ipconfig *ipconfig);
+int __connman_ipconfig_set_ipv4_fallback_ll(struct connman_ipconfig *ipconfig, const char *value);
 
 #include <connman/utsname.h>
 

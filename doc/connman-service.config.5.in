@@ -48,6 +48,13 @@ If set to \fBdhcp\fP, dhcp will be used to obtain the network settings.
 \fInetmask\fP can be specified as length of the mask rather than the
 mask itself. The gateway can be omitted when using a static IP.
 .TP
+.BI IPv4.FallbackIPv4LL=true \fR|\fB false
+If \fBtrue\fP, then IPv4LL fallback is enabled.
+If IPv4 is \fBdhcp\fP and IPv4.FallbackIPv4LL is set \fBfalse\fP,
+then IPv4LL will not be started after DHCP failed and
+will wait for DHCP server.
+Default value is \fBtrue\fP.
+.TP
 .BI IPv6=off \ \fR|\  auto\ \fR|\  network / prefixlength / gateway
 IPv6 settings for the service. If set to \fBoff\fP, IPv6 won't be used.
 If set to \fBauto\fP, settings will be obtained from the network.

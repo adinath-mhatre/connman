@@ -340,6 +340,18 @@ Properties	string State [readonly]
 
 				The current configured IPv4 gateway.
 
+			boolean FallbackIPv4LL [readonly]
+
+				Enable or disable IPv4LL fallback. The value
+				has only meaning if Method is set to "dhcp".
+
+				Value "true" means IPv4LL fallback is enabled.
+
+				Value "false" means IPv4LL will not be started
+				after DHCP failed and will wait for DHCP server.
+
+				Default value is true.
+
 		dict IPv4.Configuration [readwrite]
 
 			Same values as IPv4 property. The IPv4 represents

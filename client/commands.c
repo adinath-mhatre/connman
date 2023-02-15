@@ -985,18 +985,53 @@ static void config_append_ipv4(DBusMessageIter *iter,
 {
 	struct config_append *append = user_data;
 	char **opts = append->opts;
-	int i = 0;
 
 	if (!opts)
 		return;
 
-	while (opts[i] && ipv4[i]) {
-		__connmanctl_dbus_append_dict_entry(iter, ipv4[i],
-				DBUS_TYPE_STRING, &opts[i]);
-		i++;
+	append->values = 1;
+
+	if (g_strcmp0(opts[0], "dhcp") == 0) {
+		char *str;
+		append->values = 2;
+
+		if (g_strcmp0(opts[1], "disable") == 0) {
+			__connmanctl_dbus_append_dict_entry(iter, "FallbackIPv4LL",
+					DBUS_TYPE_STRING, &opts[1]);
+		}
+		else {
+			str = "enable";
+			__connmanctl_dbus_append_dict_entry(iter, "FallbackIPv4LL",
+					DBUS_TYPE_STRING, &str);
+		}
+
+	} else if (g_strcmp0(opts[0], "manual") == 0) {
+		int i = 1;
+
+		while (opts[i] && ipv6[i]) {
+			if (i == 2) {
+				int value = atoi(opts[i]);
+				__connmanctl_dbus_append_dict_entry(iter,
+						ipv4[i], DBUS_TYPE_BYTE,
+						&value);
+			} else {
+				__connmanctl_dbus_append_dict_entry(iter,
+						ipv4[i], DBUS_TYPE_STRING,
+						&opts[i]);
+			}
+			i++;
+		}
+
+		append->values = i;
+
+	} else if (g_strcmp0(opts[0], "off") != 0) {
+		fprintf(stderr, "Error %s: %s\n", opts[0], strerror(EINVAL));
+
+		return;
 	}
 
-	append->values = i;
+	__connmanctl_dbus_append_dict_entry(iter, "Method", DBUS_TYPE_STRING,
+				&opts[0]);
 }
 
 static void config_append_ipv6(DBusMessageIter *iter, void *user_data)
@@ -2435,7 +2470,8 @@ static struct connman_option config_options[] = {
 	{"proxy", 'x', "direct|auto <URL>|manual <URL1> [<URL2>] [...]\n"
 	               "\t\t\t[exclude <exclude1> [<exclude2>] [...]]"},
 	{"autoconnect", 'a', "yes|no"},
-	{"ipv4", 'i', "off|dhcp|manual <address> <netmask> <gateway>"},
+	{"ipv4", 'i', "off|dhcp [enable|disable]|\n"
+		      "\t\t\tmanual <address> <netmask> <gateway>"},
 	{"remove", 'r', "                 Remove service"},
 	{ NULL, }
 };

@@ -42,6 +42,12 @@ Allowed fields:
   Example: 192.168.1.2/24/192.168.1.1
            192.168.200.100/255.255.255.0/192.168.200.1
            10.0.0.2/24
+- IPv4.FallbackIPv4LL: Option to disable IPv4LL fallback.
+  If "true", then IPv4LL fallback is enabled.
+  If IPv4 is "dhcp" and IPv4.FallbackIPv4LL is set "false",
+  then IPv4LL will not be started after DHCP failed and
+  will wait for DHCP server.
+  Default value is "true".
 - IPv6: The IPv6 address, prefix length and gateway. Format of the entry
   is network/prefixlen/gateway. For IPv6 addresses only prefix length is
   accepted. The gateway can be omitted if necessary.
